@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Pablo Merlo" />
+
+<meta name="date" content="2026-03-25" />
+
+<title>MultiscaleSCP: Multiscale SCP workflow example</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">MultiscaleSCP: Multiscale SCP workflow
+example</h1>
+<h4 class="author">Pablo Merlo</h4>
+<h4 class="date">2026-03-25</h4>
+
+
+
+<div id="overview" class="section level1">
+<h1>Overview</h1>
+<p><strong>MultiscaleSCP</strong> extends <code>prioritizr</code> to
+support hierarchical (multiresolution) planning units based on the H3
+grid.</p>
+<p><strong>What is H3?</strong><br />
+H3 is a global hierarchical hexagonal grid system developed by Uber. It
+divides the Earth into nested hexagonal cells at discrete resolutions.
+Each cell has a unique index that encodes its place in the hierarchy, so
+every cell has:</p>
+<ul>
+<li>exactly one parent cell at the next coarser resolution, and<br />
+</li>
+<li>multiple child cells at the next finer resolution.</li>
+</ul>
+<p>This explicit parent–child structure makes H3 convenient for
+multiscale conservation planning because it lets you <em>formally
+link</em> planning units at different spatial resolutions through
+lineage relationships (ancestor ↔︎ descendant).</p>
+<p>MultiscaleSCP leverages these links to:</p>
+<ul>
+<li>build cross-resolution connectivity penalties during
+optimization,<br />
+</li>
+<li>propagate information (e.g., rarity scores, coverage metrics,
+selection status) across resolutions in a controlled way, and<br />
+</li>
+<li>derive post-hoc scenarios that satisfy resolution- and
+strata-specific area targets.</li>
+</ul>
+</div>
+<div id="object-flow" class="section level1">
+<h1>Object flow</h1>
+<p>A typical workflow follows this structure:</p>
+<pre><code>Planning Units (sf)
+        ↓
+build_h3_maps()
+        ↓
+build_crossscale_index()
+        ↓
+build_multiscale_connectivity_matrix()
+        ↓
+prioritizr problem + add_multiscale_connectivity_penalties()
+        ↓
+solve()
+        ↓
+post-processing (overlap diagnostics, deduplication, scoring, scenarios, coverage, feature evaluation)</code></pre>
+</div>
+<div id="end-to-end-workflow-example-2-h3-resolutions" class="section level1">
+<h1>End-to-end workflow example (2 H3 resolutions)</h1>
+<p>This single example illustrates an end-to-end multiscale workflow on
+a tiny artificial dataset. To keep the vignette fast and
+solver-independent, we <strong>do not</strong> run an optimizer here.
+Instead, we fabricate small 0/1 “solution” columns to demonstrate the
+post-hoc tools (deduplication, scenarios, coverage, and feature
+evaluation).</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># tiny multiscale H3 system (3 parents at resolution 7; 2 kids at resolution 8 under parent1)</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>parent1 <span class="ot">&lt;-</span> <span class="st">&quot;87182e586ffffff&quot;</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>kids1   <span class="ot">&lt;-</span> <span class="fu">unlist</span>(h3jsr<span class="sc">::</span><span class="fu">get_children</span>(parent1, <span class="dv">8</span>, <span class="at">simple =</span> <span class="cn">TRUE</span>), <span class="at">use.names =</span> <span class="cn">FALSE</span>)[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>]</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>parent2 <span class="ot">&lt;-</span> <span class="st">&quot;87182e584ffffff&quot;</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>parent3 <span class="ot">&lt;-</span> <span class="st">&quot;87182e5b3ffffff&quot;</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>h3_vec  <span class="ot">&lt;-</span> <span class="fu">c</span>(parent1, parent2, parent3, kids1)</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>res_vec <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">7</span><span class="dt">L</span>, <span class="dv">7</span><span class="dt">L</span>, <span class="dv">7</span><span class="dt">L</span>, <span class="dv">8</span><span class="dt">L</span>, <span class="dv">8</span><span class="dt">L</span>) <span class="co">#resolution vector</span></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co"># Create polygon geometries from H3 cells</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>geom <span class="ot">&lt;-</span> <span class="fu">do.call</span>(c, <span class="fu">lapply</span>(h3_vec, <span class="cf">function</span>(x) h3jsr<span class="sc">::</span><span class="fu">cell_to_polygon</span>(x, <span class="at">simple =</span> <span class="cn">TRUE</span>)))</span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>  <span class="at">h3_address =</span> h3_vec,</span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>  <span class="at">res        =</span> res_vec,</span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>  <span class="at">area_km2   =</span> <span class="fu">c</span>(<span class="dv">14</span>,<span class="dv">14</span>,<span class="dv">14</span>,<span class="dv">2</span>,<span class="dv">2</span>), <span class="co">#not true H3 areas</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>  <span class="at">admin      =</span> <span class="fu">c</span>(<span class="st">&quot;A&quot;</span>, <span class="st">&quot;B&quot;</span>, <span class="st">&quot;B&quot;</span>, <span class="st">&quot;C&quot;</span>, <span class="st">&quot;C&quot;</span>) <span class="co">#e.g., 2 countries and 1 county within one of them</span></span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>)</span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a>s <span class="ot">&lt;-</span> sf<span class="sc">::</span><span class="fu">st_sf</span>(df, <span class="at">geometry =</span> geom) <span class="sc">|&gt;</span> sf<span class="sc">::</span><span class="fu">st_set_crs</span>(<span class="dv">4326</span>)</span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="co"># Feature matrix (resolution-prefixed)</span></span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="co"># In a real workflow, these are typically PU-level feature relative coverage of each polygon.</span></span>
+<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>feature_mat <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>  <span class="at">r7_f1 =</span> <span class="fu">c</span>(<span class="fl">1.0</span>, <span class="fl">0.2</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>),   <span class="co"># only meaningful at r7 rows</span></span>
+<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a>  <span class="at">r8_f1 =</span> <span class="fu">c</span>(<span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.0</span>, <span class="fl">0.6</span>, <span class="fl">0.2</span>)    <span class="co"># only meaningful at r8 rows</span></span>
+<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a>)</span>
+<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a><span class="co"># Also attach features as columns (so eval_geom_feature_coverage() can use them directly)</span></span>
+<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a>s <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">bind_cols</span>(s, feature_mat)</span>
+<span id="cb2-31"><a href="#cb2-31" tabindex="-1"></a></span>
+<span id="cb2-32"><a href="#cb2-32" tabindex="-1"></a><span class="co"># Build hierarchy, cross-scale index, and multiscale connectivity matrix</span></span>
+<span id="cb2-33"><a href="#cb2-33" tabindex="-1"></a>maps   <span class="ot">&lt;-</span> <span class="fu">build_h3_maps</span>(s, <span class="at">res_levels =</span> <span class="fu">c</span>(<span class="dv">7</span><span class="dt">L</span>, <span class="dv">8</span><span class="dt">L</span>))  <span class="co">#`maps` stores ancestry mappings.  </span></span>
+<span id="cb2-34"><a href="#cb2-34" tabindex="-1"></a>cs_idx <span class="ot">&lt;-</span> <span class="fu">build_crossscale_index</span>(maps)              <span class="co">#`cs_idx` stores fast row-level indices used in scoring and selection algorithms.</span></span>
+<span id="cb2-35"><a href="#cb2-35" tabindex="-1"></a>conn   <span class="ot">&lt;-</span> <span class="fu">build_multiscale_connectivity_matrix</span>(maps)</span>
+<span id="cb2-36"><a href="#cb2-36" tabindex="-1"></a>conn      <span class="co">#This sparse matrix encodes parent–child connections across resolutions.</span></span>
+<span id="cb2-37"><a href="#cb2-37" tabindex="-1"></a><span class="co">#&gt; 5 x 5 sparse Matrix of class &quot;dgCMatrix&quot;</span></span>
+<span id="cb2-38"><a href="#cb2-38" tabindex="-1"></a><span class="co">#&gt;               </span></span>
+<span id="cb2-39"><a href="#cb2-39" tabindex="-1"></a><span class="co">#&gt; [1,] . . . 1 1</span></span>
+<span id="cb2-40"><a href="#cb2-40" tabindex="-1"></a><span class="co">#&gt; [2,] . . . . .</span></span>
+<span id="cb2-41"><a href="#cb2-41" tabindex="-1"></a><span class="co">#&gt; [3,] . . . . .</span></span>
+<span id="cb2-42"><a href="#cb2-42" tabindex="-1"></a><span class="co">#&gt; [4,] 1 . . . .</span></span>
+<span id="cb2-43"><a href="#cb2-43" tabindex="-1"></a><span class="co">#&gt; [5,] 1 . . . .</span></span>
+<span id="cb2-44"><a href="#cb2-44" tabindex="-1"></a></span>
+<span id="cb2-45"><a href="#cb2-45" tabindex="-1"></a><span class="co"># prioritizr problem (not solving to keep vignette fast)</span></span>
+<span id="cb2-46"><a href="#cb2-46" tabindex="-1"></a><span class="co">#p &lt;- problem(s, features = colnames(feature_mat))... #create a problem</span></span>
+<span id="cb2-47"><a href="#cb2-47" tabindex="-1"></a></span>
+<span id="cb2-48"><a href="#cb2-48" tabindex="-1"></a><span class="co">#`add_multiscale_connectivity_penalties()` encourages co-selection between connected parent–child cells: increasing the penalty encourages more nested, scale-consistent solutions.</span></span>
+<span id="cb2-49"><a href="#cb2-49" tabindex="-1"></a><span class="co"># p &lt;- add_multiscale_connectivity_penalties(</span></span>
+<span id="cb2-50"><a href="#cb2-50" tabindex="-1"></a><span class="co">#   p, penalty = 1, data = conn)</span></span>
+<span id="cb2-51"><a href="#cb2-51" tabindex="-1"></a><span class="co"># s &lt;- solve(p) # any prioritizr-compatible solver may be used </span></span>
+<span id="cb2-52"><a href="#cb2-52" tabindex="-1"></a></span>
+<span id="cb2-53"><a href="#cb2-53" tabindex="-1"></a><span class="co"># Fabricate a small &quot;portfolio&quot; of solutions (0/1 columns) to demonstrate post-hoc tools</span></span>
+<span id="cb2-54"><a href="#cb2-54" tabindex="-1"></a><span class="co"># In a real workflow these columns would come from solve(p).</span></span>
+<span id="cb2-55"><a href="#cb2-55" tabindex="-1"></a><span class="co"># solution_1 co-selects parent1 and kid1 =&gt; overlap exists</span></span>
+<span id="cb2-56"><a href="#cb2-56" tabindex="-1"></a>s<span class="sc">$</span>solution_1 <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span><span class="dt">L</span>, <span class="dv">0</span><span class="dt">L</span>, <span class="dv">0</span><span class="dt">L</span>, <span class="dv">1</span><span class="dt">L</span>, <span class="dv">0</span><span class="dt">L</span>)</span>
+<span id="cb2-57"><a href="#cb2-57" tabindex="-1"></a>s<span class="sc">$</span>solution_2 <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">0</span><span class="dt">L</span>, <span class="dv">0</span><span class="dt">L</span>, <span class="dv">1</span><span class="dt">L</span>, <span class="dv">0</span><span class="dt">L</span>, <span class="dv">1</span><span class="dt">L</span>)</span>
+<span id="cb2-58"><a href="#cb2-58" tabindex="-1"></a></span>
+<span id="cb2-59"><a href="#cb2-59" tabindex="-1"></a><span class="co"># Overlap diagnostics on raw selections (counts co-selected ancestor–descendant pairs)</span></span>
+<span id="cb2-60"><a href="#cb2-60" tabindex="-1"></a><span class="fu">compute_overlaps_by_resolution</span>(</span>
+<span id="cb2-61"><a href="#cb2-61" tabindex="-1"></a>  <span class="at">s        =</span> s,</span>
+<span id="cb2-62"><a href="#cb2-62" tabindex="-1"></a>  <span class="at">flag_col =</span> <span class="st">&quot;solution_1&quot;</span>,</span>
+<span id="cb2-63"><a href="#cb2-63" tabindex="-1"></a>  <span class="at">maps     =</span> maps</span>
+<span id="cb2-64"><a href="#cb2-64" tabindex="-1"></a>)</span>
+<span id="cb2-65"><a href="#cb2-65" tabindex="-1"></a><span class="co">#&gt;   7-8 total </span></span>
+<span id="cb2-66"><a href="#cb2-66" tabindex="-1"></a><span class="co">#&gt;     1     1</span></span>
+<span id="cb2-67"><a href="#cb2-67" tabindex="-1"></a></span>
+<span id="cb2-68"><a href="#cb2-68" tabindex="-1"></a><span class="co"># Deduplicate overlaps:</span></span>
+<span id="cb2-69"><a href="#cb2-69" tabindex="-1"></a><span class="co"># Multiscale solutions may co-select both a coarse-resolution cell and one or more of its finer descendants; `deduplicate_h3_selections()` resolves these overlaps by retaining only one representative planning unit per location according to a chosen rule (i.e., `&quot;finer_first&quot;` or `&quot;coarser_first&quot;`).</span></span>
+<span id="cb2-70"><a href="#cb2-70" tabindex="-1"></a><span class="co"># &quot;finer_first&quot;: keep children; drop overlapping ancestors (the resulting solution may have less total area than the original solution if not all the children were selected)</span></span>
+<span id="cb2-71"><a href="#cb2-71" tabindex="-1"></a>s_finer <span class="ot">&lt;-</span> <span class="fu">deduplicate_h3_selections</span>(</span>
+<span id="cb2-72"><a href="#cb2-72" tabindex="-1"></a>  <span class="at">s                     =</span> s,</span>
+<span id="cb2-73"><a href="#cb2-73" tabindex="-1"></a>  <span class="at">sel_col               =</span> <span class="st">&quot;solution_1&quot;</span>,</span>
+<span id="cb2-74"><a href="#cb2-74" tabindex="-1"></a>  <span class="at">h3_vec                =</span> maps<span class="sc">$</span>h3_vec,</span>
+<span id="cb2-75"><a href="#cb2-75" tabindex="-1"></a>  <span class="at">res_vec               =</span> maps<span class="sc">$</span>res_vec,</span>
+<span id="cb2-76"><a href="#cb2-76" tabindex="-1"></a>  <span class="at">res_levels            =</span> maps<span class="sc">$</span>res_levels,</span>
+<span id="cb2-77"><a href="#cb2-77" tabindex="-1"></a>  <span class="at">nearest_parent_row_of =</span> maps<span class="sc">$</span>nearest_parent_row_of,</span>
+<span id="cb2-78"><a href="#cb2-78" tabindex="-1"></a>  <span class="at">children_by_row       =</span> maps<span class="sc">$</span>children_by_row,</span>
+<span id="cb2-79"><a href="#cb2-79" tabindex="-1"></a>  <span class="at">mode                  =</span> <span class="st">&quot;finer_first&quot;</span></span>
+<span id="cb2-80"><a href="#cb2-80" tabindex="-1"></a>)</span>
+<span id="cb2-81"><a href="#cb2-81" tabindex="-1"></a><span class="co"># &quot;coarser_first&quot;: keep parent; drop overlapping children (total area is the same as the deduplicated solution)</span></span>
+<span id="cb2-82"><a href="#cb2-82" tabindex="-1"></a>s_coarser <span class="ot">&lt;-</span> <span class="fu">deduplicate_h3_selections</span>(</span>
+<span id="cb2-83"><a href="#cb2-83" tabindex="-1"></a>  <span class="at">s                     =</span> s,</span>
+<span id="cb2-84"><a href="#cb2-84" tabindex="-1"></a>  <span class="at">sel_col               =</span> <span class="st">&quot;solution_1&quot;</span>,</span>
+<span id="cb2-85"><a href="#cb2-85" tabindex="-1"></a>  <span class="at">h3_vec                =</span> maps<span class="sc">$</span>h3_vec,</span>
+<span id="cb2-86"><a href="#cb2-86" tabindex="-1"></a>  <span class="at">res_vec               =</span> maps<span class="sc">$</span>res_vec,</span>
+<span id="cb2-87"><a href="#cb2-87" tabindex="-1"></a>  <span class="at">res_levels            =</span> maps<span class="sc">$</span>res_levels,</span>
+<span id="cb2-88"><a href="#cb2-88" tabindex="-1"></a>  <span class="at">nearest_parent_row_of =</span> maps<span class="sc">$</span>nearest_parent_row_of,</span>
+<span id="cb2-89"><a href="#cb2-89" tabindex="-1"></a>  <span class="at">children_by_row       =</span> maps<span class="sc">$</span>children_by_row,</span>
+<span id="cb2-90"><a href="#cb2-90" tabindex="-1"></a>  <span class="at">mode                  =</span> <span class="st">&quot;coarser_first&quot;</span></span>
+<span id="cb2-91"><a href="#cb2-91" tabindex="-1"></a>)</span>
+<span id="cb2-92"><a href="#cb2-92" tabindex="-1"></a></span>
+<span id="cb2-93"><a href="#cb2-93" tabindex="-1"></a><span class="co"># Compare what is kept (new column solution_1_deduplicated added, solution_1 column remain untouched)</span></span>
+<span id="cb2-94"><a href="#cb2-94" tabindex="-1"></a>sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>(s_finer)[, <span class="fu">c</span>(<span class="st">&quot;h3_address&quot;</span>,<span class="st">&quot;res&quot;</span>,<span class="st">&quot;solution_1&quot;</span>,<span class="st">&quot;solution_1_deduplicated&quot;</span>)]</span>
+<span id="cb2-95"><a href="#cb2-95" tabindex="-1"></a><span class="co">#&gt;        h3_address res solution_1 solution_1_deduplicated</span></span>
+<span id="cb2-96"><a href="#cb2-96" tabindex="-1"></a><span class="co">#&gt; 1 87182e586ffffff   7          1                       0</span></span>
+<span id="cb2-97"><a href="#cb2-97" tabindex="-1"></a><span class="co">#&gt; 2 87182e584ffffff   7          0                       0</span></span>
+<span id="cb2-98"><a href="#cb2-98" tabindex="-1"></a><span class="co">#&gt; 3 87182e5b3ffffff   7          0                       0</span></span>
+<span id="cb2-99"><a href="#cb2-99" tabindex="-1"></a><span class="co">#&gt; 4 88182e5861fffff   8          1                       1</span></span>
+<span id="cb2-100"><a href="#cb2-100" tabindex="-1"></a><span class="co">#&gt; 5 88182e5863fffff   8          0                       0</span></span>
+<span id="cb2-101"><a href="#cb2-101" tabindex="-1"></a>sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>(s_coarser)[, <span class="fu">c</span>(<span class="st">&quot;h3_address&quot;</span>,<span class="st">&quot;res&quot;</span>,<span class="st">&quot;solution_1&quot;</span>,<span class="st">&quot;solution_1_deduplicated&quot;</span>)]</span>
+<span id="cb2-102"><a href="#cb2-102" tabindex="-1"></a><span class="co">#&gt;        h3_address res solution_1 solution_1_deduplicated</span></span>
+<span id="cb2-103"><a href="#cb2-103" tabindex="-1"></a><span class="co">#&gt; 1 87182e586ffffff   7          1                       1</span></span>
+<span id="cb2-104"><a href="#cb2-104" tabindex="-1"></a><span class="co">#&gt; 2 87182e584ffffff   7          0                       0</span></span>
+<span id="cb2-105"><a href="#cb2-105" tabindex="-1"></a><span class="co">#&gt; 3 87182e5b3ffffff   7          0                       0</span></span>
+<span id="cb2-106"><a href="#cb2-106" tabindex="-1"></a><span class="co">#&gt; 4 88182e5861fffff   8          1                       0</span></span>
+<span id="cb2-107"><a href="#cb2-107" tabindex="-1"></a><span class="co">#&gt; 5 88182e5863fffff   8          0                       0</span></span>
+<span id="cb2-108"><a href="#cb2-108" tabindex="-1"></a></span>
+<span id="cb2-109"><a href="#cb2-109" tabindex="-1"></a><span class="co"># Compute PU scores</span></span>
+<span id="cb2-110"><a href="#cb2-110" tabindex="-1"></a><span class="co"># This function calculates a continuous importance score at each planning unit’s native resolution to create an importance ranking that can be used in the &quot;scenario creation&quot; (i.e., by the compute_selection_by_resolution and compute_selection_by_strata functions). </span></span>
+<span id="cb2-111"><a href="#cb2-111" tabindex="-1"></a>s_scored <span class="ot">&lt;-</span> <span class="fu">compute_pu_scores</span>(</span>
+<span id="cb2-112"><a href="#cb2-112" tabindex="-1"></a>  <span class="at">s           =</span> s,</span>
+<span id="cb2-113"><a href="#cb2-113" tabindex="-1"></a>  <span class="at">feature_mat =</span> feature_mat,</span>
+<span id="cb2-114"><a href="#cb2-114" tabindex="-1"></a>  <span class="at">alpha_freq  =</span> <span class="fl">0.5</span>)</span>
+<span id="cb2-115"><a href="#cb2-115" tabindex="-1"></a>sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>(s_scored)[, <span class="fu">c</span>(<span class="st">&quot;h3_address&quot;</span>,<span class="st">&quot;res&quot;</span>,<span class="st">&quot;ensemble_score&quot;</span>)]</span>
+<span id="cb2-116"><a href="#cb2-116" tabindex="-1"></a><span class="co">#&gt;        h3_address res ensemble_score</span></span>
+<span id="cb2-117"><a href="#cb2-117" tabindex="-1"></a><span class="co">#&gt; 1 87182e586ffffff   7      0.6220529</span></span>
+<span id="cb2-118"><a href="#cb2-118" tabindex="-1"></a><span class="co">#&gt; 2 87182e584ffffff   7      0.1250000</span></span>
+<span id="cb2-119"><a href="#cb2-119" tabindex="-1"></a><span class="co">#&gt; 3 87182e5b3ffffff   7      0.2470529</span></span>
+<span id="cb2-120"><a href="#cb2-120" tabindex="-1"></a><span class="co">#&gt; 4 88182e5861fffff   8      0.7470529</span></span>
+<span id="cb2-121"><a href="#cb2-121" tabindex="-1"></a><span class="co">#&gt; 5 88182e5863fffff   8      0.4970529</span></span>
+<span id="cb2-122"><a href="#cb2-122" tabindex="-1"></a></span>
+<span id="cb2-123"><a href="#cb2-123" tabindex="-1"></a><span class="co"># Cross-scale scores: </span></span>
+<span id="cb2-124"><a href="#cb2-124" tabindex="-1"></a><span class="co"># extends the scoring concept across resolutions and for each planning unit, the function computes scores at its &quot;native&quot; resolution and propagates them through the hierarchical structure. As a result, every planning unit with ancestors/descendants receives its native importance score and additional resolution-specific scores propagated through the hierarchy (one column per resolution).</span></span>
+<span id="cb2-125"><a href="#cb2-125" tabindex="-1"></a><span class="co"># These scores allow users to compare how different scales prioritize the same location (according to the features defined at that resolution).</span></span>
+<span id="cb2-126"><a href="#cb2-126" tabindex="-1"></a>s_xscored <span class="ot">&lt;-</span> <span class="fu">compute_pu_scores_crossscale</span>(</span>
+<span id="cb2-127"><a href="#cb2-127" tabindex="-1"></a>  <span class="at">s           =</span> s,</span>
+<span id="cb2-128"><a href="#cb2-128" tabindex="-1"></a>  <span class="at">feature_mat =</span> feature_mat,</span>
+<span id="cb2-129"><a href="#cb2-129" tabindex="-1"></a>  <span class="at">maps        =</span> maps,</span>
+<span id="cb2-130"><a href="#cb2-130" tabindex="-1"></a>  <span class="at">cs_idx      =</span> cs_idx,</span>
+<span id="cb2-131"><a href="#cb2-131" tabindex="-1"></a>  <span class="at">agg_mode    =</span> <span class="st">&quot;mean&quot;</span>,</span>
+<span id="cb2-132"><a href="#cb2-132" tabindex="-1"></a>  <span class="at">res_col     =</span> <span class="st">&quot;res&quot;</span></span>
+<span id="cb2-133"><a href="#cb2-133" tabindex="-1"></a>)</span>
+<span id="cb2-134"><a href="#cb2-134" tabindex="-1"></a>sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>(s_xscored)[, <span class="fu">c</span>(<span class="st">&quot;h3_address&quot;</span>,<span class="st">&quot;res&quot;</span>,<span class="st">&quot;score_from_r7&quot;</span>,<span class="st">&quot;score_from_r8&quot;</span>)]</span>
+<span id="cb2-135"><a href="#cb2-135" tabindex="-1"></a><span class="co">#&gt;        h3_address res score_from_r7 score_from_r8</span></span>
+<span id="cb2-136"><a href="#cb2-136" tabindex="-1"></a><span class="co">#&gt; 1 87182e586ffffff   7          0.75           0.5</span></span>
+<span id="cb2-137"><a href="#cb2-137" tabindex="-1"></a><span class="co">#&gt; 2 87182e584ffffff   7          0.25           0.0</span></span>
+<span id="cb2-138"><a href="#cb2-138" tabindex="-1"></a><span class="co">#&gt; 3 87182e5b3ffffff   7          0.00           0.0</span></span>
+<span id="cb2-139"><a href="#cb2-139" tabindex="-1"></a><span class="co">#&gt; 4 88182e5861fffff   8          0.75           1.0</span></span>
+<span id="cb2-140"><a href="#cb2-140" tabindex="-1"></a><span class="co">#&gt; 5 88182e5863fffff   8          0.75           0.0</span></span>
+<span id="cb2-141"><a href="#cb2-141" tabindex="-1"></a></span>
+<span id="cb2-142"><a href="#cb2-142" tabindex="-1"></a><span class="co"># Post-hoc scenarios</span></span>
+<span id="cb2-143"><a href="#cb2-143" tabindex="-1"></a><span class="co"># These functions rank planning units by importance and select the top units until user-defined area targets are met. Targets may be defined:</span></span>
+<span id="cb2-144"><a href="#cb2-144" tabindex="-1"></a><span class="co"># a) By resolution (e.g. 30% of total area at each resolution, each resolution can have its own target)</span></span>
+<span id="cb2-145"><a href="#cb2-145" tabindex="-1"></a>s_res_scen <span class="ot">&lt;-</span> <span class="fu">compute_selection_by_resolution</span>(</span>
+<span id="cb2-146"><a href="#cb2-146" tabindex="-1"></a>  <span class="at">s         =</span> s_scored,</span>
+<span id="cb2-147"><a href="#cb2-147" tabindex="-1"></a>  <span class="at">cs_idx    =</span> cs_idx,</span>
+<span id="cb2-148"><a href="#cb2-148" tabindex="-1"></a>  <span class="at">target    =</span> <span class="fl">0.30</span>,</span>
+<span id="cb2-149"><a href="#cb2-149" tabindex="-1"></a>  <span class="at">score_col =</span> <span class="st">&quot;ensemble_score&quot;</span>,</span>
+<span id="cb2-150"><a href="#cb2-150" tabindex="-1"></a>  <span class="at">area_col  =</span> <span class="st">&quot;area_km2&quot;</span>,</span>
+<span id="cb2-151"><a href="#cb2-151" tabindex="-1"></a>  <span class="at">res_col   =</span> <span class="st">&quot;res&quot;</span>,</span>
+<span id="cb2-152"><a href="#cb2-152" tabindex="-1"></a>  <span class="at">out_col   =</span> <span class="st">&quot;selected_by_resolution&quot;</span>,</span>
+<span id="cb2-153"><a href="#cb2-153" tabindex="-1"></a>  <span class="at">target_by_res =</span> <span class="fu">c</span>(<span class="st">&quot;7&quot;</span> <span class="ot">=</span> <span class="fl">0.30</span>, <span class="st">&quot;8&quot;</span> <span class="ot">=</span> <span class="fl">0.50</span>)</span>
+<span id="cb2-154"><a href="#cb2-154" tabindex="-1"></a>)</span>
+<span id="cb2-155"><a href="#cb2-155" tabindex="-1"></a></span>
+<span id="cb2-156"><a href="#cb2-156" tabindex="-1"></a>sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>(s_res_scen)[, <span class="fu">c</span>(<span class="st">&quot;h3_address&quot;</span>,<span class="st">&quot;res&quot;</span>,<span class="st">&quot;area_km2&quot;</span>,<span class="st">&quot;ensemble_score&quot;</span>,<span class="st">&quot;selected_by_resolution&quot;</span>)]</span>
+<span id="cb2-157"><a href="#cb2-157" tabindex="-1"></a><span class="co">#&gt;        h3_address res area_km2 ensemble_score selected_by_resolution</span></span>
+<span id="cb2-158"><a href="#cb2-158" tabindex="-1"></a><span class="co">#&gt; 1 87182e586ffffff   7       14      0.6220529                      0</span></span>
+<span id="cb2-159"><a href="#cb2-159" tabindex="-1"></a><span class="co">#&gt; 2 87182e584ffffff   7       14      0.1250000                      0</span></span>
+<span id="cb2-160"><a href="#cb2-160" tabindex="-1"></a><span class="co">#&gt; 3 87182e5b3ffffff   7       14      0.2470529                      1</span></span>
+<span id="cb2-161"><a href="#cb2-161" tabindex="-1"></a><span class="co">#&gt; 4 88182e5861fffff   8        2      0.7470529                      1</span></span>
+<span id="cb2-162"><a href="#cb2-162" tabindex="-1"></a><span class="co">#&gt; 5 88182e5863fffff   8        2      0.4970529                      0</span></span>
+<span id="cb2-163"><a href="#cb2-163" tabindex="-1"></a></span>
+<span id="cb2-164"><a href="#cb2-164" tabindex="-1"></a><span class="co"># b) By strata (simulate governance constraints, e.g. different targets per administrative unit such as countries, counties, etc)</span></span>
+<span id="cb2-165"><a href="#cb2-165" tabindex="-1"></a>strata_masks <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb2-166"><a href="#cb2-166" tabindex="-1"></a>  <span class="at">A =</span> (sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>(s_res_scen)<span class="sc">$</span>admin <span class="sc">==</span> <span class="st">&quot;A&quot;</span>),</span>
+<span id="cb2-167"><a href="#cb2-167" tabindex="-1"></a>  <span class="at">B =</span> (sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>(s_res_scen)<span class="sc">$</span>admin <span class="sc">==</span> <span class="st">&quot;B&quot;</span>),</span>
+<span id="cb2-168"><a href="#cb2-168" tabindex="-1"></a>  <span class="at">C =</span> (sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>(s_res_scen)<span class="sc">$</span>admin <span class="sc">==</span> <span class="st">&quot;C&quot;</span>))</span>
+<span id="cb2-169"><a href="#cb2-169" tabindex="-1"></a></span>
+<span id="cb2-170"><a href="#cb2-170" tabindex="-1"></a>s_strat_scen <span class="ot">&lt;-</span> <span class="fu">compute_selection_by_strata</span>(</span>
+<span id="cb2-171"><a href="#cb2-171" tabindex="-1"></a>  <span class="at">s                =</span> s_scored,</span>
+<span id="cb2-172"><a href="#cb2-172" tabindex="-1"></a>  <span class="at">cs_idx           =</span> cs_idx,</span>
+<span id="cb2-173"><a href="#cb2-173" tabindex="-1"></a>  <span class="at">strata_masks     =</span> strata_masks,</span>
+<span id="cb2-174"><a href="#cb2-174" tabindex="-1"></a>  <span class="at">admin_strata     =</span> <span class="st">&quot;admin&quot;</span>,</span>
+<span id="cb2-175"><a href="#cb2-175" tabindex="-1"></a>  <span class="at">score_col        =</span> <span class="st">&quot;ensemble_score&quot;</span>,</span>
+<span id="cb2-176"><a href="#cb2-176" tabindex="-1"></a>  <span class="at">area_col         =</span> <span class="st">&quot;area_km2&quot;</span>,</span>
+<span id="cb2-177"><a href="#cb2-177" tabindex="-1"></a>  <span class="at">res_col          =</span> <span class="st">&quot;res&quot;</span>,</span>
+<span id="cb2-178"><a href="#cb2-178" tabindex="-1"></a>  <span class="at">out_col          =</span> <span class="st">&quot;selected_by_admin&quot;</span>,</span>
+<span id="cb2-179"><a href="#cb2-179" tabindex="-1"></a>  <span class="at">target_by_strata =</span> <span class="fu">c</span>(<span class="at">A =</span> <span class="fl">0.14</span>, <span class="at">B =</span> <span class="fl">0.50</span>, <span class="at">C =</span> <span class="fl">0.50</span>)</span>
+<span id="cb2-180"><a href="#cb2-180" tabindex="-1"></a>)</span>
+<span id="cb2-181"><a href="#cb2-181" tabindex="-1"></a></span>
+<span id="cb2-182"><a href="#cb2-182" tabindex="-1"></a>sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>(s_strat_scen)[, <span class="fu">c</span>(<span class="st">&quot;admin&quot;</span>,<span class="st">&quot;h3_address&quot;</span>,<span class="st">&quot;res&quot;</span>,<span class="st">&quot;area_km2&quot;</span>,<span class="st">&quot;ensemble_score&quot;</span>,<span class="st">&quot;selected_by_admin&quot;</span>)]</span>
+<span id="cb2-183"><a href="#cb2-183" tabindex="-1"></a><span class="co">#&gt;   admin      h3_address res area_km2 ensemble_score selected_by_admin</span></span>
+<span id="cb2-184"><a href="#cb2-184" tabindex="-1"></a><span class="co">#&gt; 1     A 87182e586ffffff   7       14      0.6220529                 0</span></span>
+<span id="cb2-185"><a href="#cb2-185" tabindex="-1"></a><span class="co">#&gt; 2     B 87182e584ffffff   7       14      0.1250000                 0</span></span>
+<span id="cb2-186"><a href="#cb2-186" tabindex="-1"></a><span class="co">#&gt; 3     B 87182e5b3ffffff   7       14      0.2470529                 1</span></span>
+<span id="cb2-187"><a href="#cb2-187" tabindex="-1"></a><span class="co">#&gt; 4     C 88182e5861fffff   8        2      0.7470529                 1</span></span>
+<span id="cb2-188"><a href="#cb2-188" tabindex="-1"></a><span class="co">#&gt; 5     C 88182e5863fffff   8        2      0.4970529                 0</span></span>
+<span id="cb2-189"><a href="#cb2-189" tabindex="-1"></a></span>
+<span id="cb2-190"><a href="#cb2-190" tabindex="-1"></a><span class="co"># Coverage summaries</span></span>
+<span id="cb2-191"><a href="#cb2-191" tabindex="-1"></a><span class="co"># These functions account explicitly for hierarchical overlap, which is important when reporting protected areas in multiscale systems where the same location may appear simultaneously as a coarse-resolution cell and multiple finer-resolution descendants (i.e., there is no &quot;deduplication&quot; step). They credit coverage once per location by propagating selections across the parent–child structure before computing area totals. This ensures that reported coverage reflects the actual spatial footprint rather than raw counts of selected planning units.</span></span>
+<span id="cb2-192"><a href="#cb2-192" tabindex="-1"></a><span class="fu">summarize_coverage_by_resolution</span>(</span>
+<span id="cb2-193"><a href="#cb2-193" tabindex="-1"></a>  <span class="at">s        =</span> s_res_scen,</span>
+<span id="cb2-194"><a href="#cb2-194" tabindex="-1"></a>  <span class="at">flag_col =</span> <span class="st">&quot;selected_by_resolution&quot;</span>,</span>
+<span id="cb2-195"><a href="#cb2-195" tabindex="-1"></a>  <span class="at">cs_idx   =</span> cs_idx</span>
+<span id="cb2-196"><a href="#cb2-196" tabindex="-1"></a>)</span>
+<span id="cb2-197"><a href="#cb2-197" tabindex="-1"></a><span class="co">#&gt; # A tibble: 2 × 4</span></span>
+<span id="cb2-198"><a href="#cb2-198" tabindex="-1"></a><span class="co">#&gt;     res area_total_km2 area_selected_km2 coverage_prop</span></span>
+<span id="cb2-199"><a href="#cb2-199" tabindex="-1"></a><span class="co">#&gt;   &lt;int&gt;          &lt;dbl&gt;             &lt;dbl&gt;         &lt;dbl&gt;</span></span>
+<span id="cb2-200"><a href="#cb2-200" tabindex="-1"></a><span class="co">#&gt; 1     7             42                16         0.381</span></span>
+<span id="cb2-201"><a href="#cb2-201" tabindex="-1"></a><span class="co">#&gt; 2     8              4                 2         0.5</span></span>
+<span id="cb2-202"><a href="#cb2-202" tabindex="-1"></a></span>
+<span id="cb2-203"><a href="#cb2-203" tabindex="-1"></a><span class="fu">summarize_coverage_by_strata</span>(</span>
+<span id="cb2-204"><a href="#cb2-204" tabindex="-1"></a>  <span class="at">s            =</span> s_strat_scen,</span>
+<span id="cb2-205"><a href="#cb2-205" tabindex="-1"></a>  <span class="at">flag_col     =</span> <span class="st">&quot;selected_by_admin&quot;</span>,</span>
+<span id="cb2-206"><a href="#cb2-206" tabindex="-1"></a>  <span class="at">cs_idx       =</span> cs_idx,</span>
+<span id="cb2-207"><a href="#cb2-207" tabindex="-1"></a>  <span class="at">strata_col   =</span> <span class="st">&quot;admin&quot;</span></span>
+<span id="cb2-208"><a href="#cb2-208" tabindex="-1"></a>)</span>
+<span id="cb2-209"><a href="#cb2-209" tabindex="-1"></a><span class="co">#&gt; # A tibble: 3 × 5</span></span>
+<span id="cb2-210"><a href="#cb2-210" tabindex="-1"></a><span class="co">#&gt;   strata native_res area_total_native_km2 area_selected_km2 coverage_prop</span></span>
+<span id="cb2-211"><a href="#cb2-211" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;       &lt;int&gt;                 &lt;dbl&gt;             &lt;dbl&gt;         &lt;dbl&gt;</span></span>
+<span id="cb2-212"><a href="#cb2-212" tabindex="-1"></a><span class="co">#&gt; 1 B               7                    28                14         0.5  </span></span>
+<span id="cb2-213"><a href="#cb2-213" tabindex="-1"></a><span class="co">#&gt; 2 C               8                     4                 2         0.5  </span></span>
+<span id="cb2-214"><a href="#cb2-214" tabindex="-1"></a><span class="co">#&gt; 3 A               7                    14                 2         0.143</span></span>
+<span id="cb2-215"><a href="#cb2-215" tabindex="-1"></a></span>
+<span id="cb2-216"><a href="#cb2-216" tabindex="-1"></a><span class="co"># Feature representation in a multiscale context</span></span>
+<span id="cb2-217"><a href="#cb2-217" tabindex="-1"></a><span class="co"># Features may be defined at only one &quot;native&quot; resolution, but protection can occur via ancestors/descendants. These functions propagate selection through the H3 hierarchy so that representation is credited even when selection occurs in a non-native resolution, and without double-counting overlaps (see &quot;Why multiscale feature evaluation is needed&quot;).</span></span>
+<span id="cb2-218"><a href="#cb2-218" tabindex="-1"></a></span>
+<span id="cb2-219"><a href="#cb2-219" tabindex="-1"></a><span class="fu">eval_geom_feature_coverage</span>(</span>
+<span id="cb2-220"><a href="#cb2-220" tabindex="-1"></a>  <span class="at">s            =</span> s_strat_scen,</span>
+<span id="cb2-221"><a href="#cb2-221" tabindex="-1"></a>  <span class="at">flag_col     =</span> <span class="st">&quot;selected_by_admin&quot;</span>,</span>
+<span id="cb2-222"><a href="#cb2-222" tabindex="-1"></a>  <span class="at">feature_cols =</span> <span class="fu">c</span>(<span class="st">&quot;r7_f1&quot;</span>, <span class="st">&quot;r8_f1&quot;</span>),</span>
+<span id="cb2-223"><a href="#cb2-223" tabindex="-1"></a>  <span class="at">res_col      =</span> <span class="st">&quot;res&quot;</span>,</span>
+<span id="cb2-224"><a href="#cb2-224" tabindex="-1"></a>  <span class="at">targets      =</span> <span class="fu">c</span>(<span class="at">r7_f1 =</span> <span class="fl">0.30</span>, <span class="at">r8_f1 =</span> <span class="fl">0.30</span>)</span>
+<span id="cb2-225"><a href="#cb2-225" tabindex="-1"></a>)</span>
+<span id="cb2-226"><a href="#cb2-226" tabindex="-1"></a><span class="co">#&gt; # A tibble: 2 × 8</span></span>
+<span id="cb2-227"><a href="#cb2-227" tabindex="-1"></a><span class="co">#&gt;   feature native_res total  held rel_held target abs_shortfall rel_shortfall</span></span>
+<span id="cb2-228"><a href="#cb2-228" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;        &lt;int&gt; &lt;dbl&gt; &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt;         &lt;dbl&gt;         &lt;dbl&gt;</span></span>
+<span id="cb2-229"><a href="#cb2-229" tabindex="-1"></a><span class="co">#&gt; 1 r7_f1            7   1.2 0.143    0.119    0.3         0.217         0.181</span></span>
+<span id="cb2-230"><a href="#cb2-230" tabindex="-1"></a><span class="co">#&gt; 2 r8_f1            8   0.8 0.600    0.750    0.3         0             0</span></span>
+<span id="cb2-231"><a href="#cb2-231" tabindex="-1"></a></span>
+<span id="cb2-232"><a href="#cb2-232" tabindex="-1"></a><span class="co"># </span><span class="al">NOTE</span><span class="co">: If your features are rasters (not PU-level columns), use eval_exact_raster_coverage()</span></span>
+<span id="cb2-233"><a href="#cb2-233" tabindex="-1"></a><span class="co"># to compute area-integrated coverage directly from the raster surface.</span></span></code></pre></div>
+</div>
+<div id="required-input-structure" class="section level1">
+<h1>Required input structure</h1>
+<p>Planning unit object (<code>sf</code>), typically with at least:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>h3_address</code></td>
+<td>yes</td>
+<td>H3 cell ID</td>
+</tr>
+<tr class="even">
+<td><code>res</code></td>
+<td>yes</td>
+<td>H3 resolution (integer)</td>
+</tr>
+<tr class="odd">
+<td><code>geometry</code></td>
+<td>yes</td>
+<td>sf geometry</td>
+</tr>
+<tr class="even">
+<td><code>area_km2</code></td>
+<td>recommended</td>
+<td>Used for coverage summaries</td>
+</tr>
+<tr class="odd">
+<td><code>cost</code></td>
+<td>optional</td>
+<td>Used in optimization</td>
+</tr>
+<tr class="even">
+<td><code>admin</code></td>
+<td>optional</td>
+<td>Strata for area-constrained scenarios</td>
+</tr>
+<tr class="odd">
+<td><code>locked_in</code></td>
+<td>optional</td>
+<td>Used in scoring</td>
+</tr>
+</tbody>
+</table>
+<p>Feature inputs may be:</p>
+<ul>
+<li>a matrix/data frame with rows matching planning units, and/or</li>
+<li>feature columns already attached to the planning unit table,</li>
+<li>raster layers (for exact extraction workflows).</li>
+</ul>
+</div>
+<div id="assumptions" class="section level1">
+<h1>Assumptions</h1>
+<p>MultiscaleSCP assumes:</p>
+<ul>
+<li>planning units are nested across resolutions,</li>
+<li>H3 cell IDs correctly encode hierarchical ancestry, and</li>
+<li>feature matrices/rasters align with planning units in row order /
+footprint.</li>
+</ul>
+<div id="the-strata-classification" class="section level3">
+<h3>The strata classification</h3>
+<p>The <code>admin</code> column represents user-defined spatial strata
+(e.g., countries, counties, habitat types, management zones, or
+administrative jurisdictions). In multiscale conservation planning,
+strata are important because conservation commitments often operate at
+political or management levels rather than purely ecological ones. For
+example, a global target (e.g., 30% of Europe) may coexist with
+national-level commitments (e.g., 30% per country), and local
+constraints. The post-hoc functions: -
+<code>compute_selection_by_strata()</code> (construct a selection that
+meets per-stratum area targets), and -
+<code>summarize_coverage_by_strata()</code> (report overlap-aware
+coverage per stratum) are designed to mimic and evaluate these
+governance constraints.</p>
+</div>
+<div id="why-multiscale-feature-evaluation-is-needed" class="section level3">
+<h3>Why multiscale feature evaluation is needed</h3>
+<p>In multiscale conservation problems, ecological features (as well as
+costs and other attributes) will be naturally defined at specific
+spatial resolutions (e.g., fine-scale habitat distributions or
+coarse-scale species range models). As a result, conservation actions
+selected at different resolutions must still contribute to the
+representation of these features. Standard representation calculations
+in prioritizr (eval_feature_representation_summary()) assume that
+feature values are evaluated only in the planning units where they are
+defined. In multiscale systems, however, features are often loaded at a
+specific resolution while conservation decisions may occur at multiple
+resolutions simultaneously. For example, a feature defined at resolution
+r may be represented by selecting either that cell directly, one of its
+ancestors (coarser cells), or one of its descendants (finer cells).
+Standard evaluation functions do not account for these cross-scale
+relationships and therefore would underestimate representation unless
+the feature were replicated across all resolutions. The evaluation
+functions in MultiscaleSCP address this issue by propagating selections
+through the H3 hierarchy so that representation is correctly credited to
+parent and child cells across resolutions.</p>
+</div>
+</div>
+<div id="summary" class="section level1">
+<h1>Summary</h1>
+<p>This vignette demonstrated a full multiscale workflow on a synthetic
+example dataset, including:</p>
+<ul>
+<li>hierarchy + cross-scale indices,</li>
+<li>multiscale connectivity (for optimization coupling),</li>
+<li>overlap diagnostics and deduplication,</li>
+<li>PU scoring and cross-scale scoring,</li>
+<li>post-hoc area-target scenarios by resolution and by strata,</li>
+<li>overlap-aware coverage summaries, and</li>
+<li>feature representation evaluation that credits protection across
+resolutions.</li>
+</ul>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,188 @@
+## ----setup, include=FALSE-----------------------------------------------------
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  message  = FALSE,
+  warning  = FALSE
+)
+
+library(MultiscaleSCP)
+library(sf)
+library(prioritizr)
+library(h3jsr)
+library(dplyr)
+
+## ----example------------------------------------------------------------------
+# tiny multiscale H3 system (3 parents at resolution 7; 2 kids at resolution 8 under parent1)
+parent1 <- "87182e586ffffff"
+kids1   <- unlist(h3jsr::get_children(parent1, 8, simple = TRUE), use.names = FALSE)[1:2]
+parent2 <- "87182e584ffffff"
+parent3 <- "87182e5b3ffffff"
+
+h3_vec  <- c(parent1, parent2, parent3, kids1)
+res_vec <- c(7L, 7L, 7L, 8L, 8L) #resolution vector
+
+# Create polygon geometries from H3 cells
+geom <- do.call(c, lapply(h3_vec, function(x) h3jsr::cell_to_polygon(x, simple = TRUE)))
+
+df <- data.frame(
+  h3_address = h3_vec,
+  res        = res_vec,
+  area_km2   = c(14,14,14,2,2), #not true H3 areas
+  admin      = c("A", "B", "B", "C", "C") #e.g., 2 countries and 1 county within one of them
+)
+
+s <- sf::st_sf(df, geometry = geom) |> sf::st_set_crs(4326)
+
+# Feature matrix (resolution-prefixed)
+# In a real workflow, these are typically PU-level feature relative coverage of each polygon.
+feature_mat <- data.frame(
+  r7_f1 = c(1.0, 0.2, 0.0, 0.0, 0.0),   # only meaningful at r7 rows
+  r8_f1 = c(0.0, 0.0, 0.0, 0.6, 0.2)    # only meaningful at r8 rows
+)
+
+# Also attach features as columns (so eval_geom_feature_coverage() can use them directly)
+s <- dplyr::bind_cols(s, feature_mat)
+
+# Build hierarchy, cross-scale index, and multiscale connectivity matrix
+maps   <- build_h3_maps(s, res_levels = c(7L, 8L))  #`maps` stores ancestry mappings.  
+cs_idx <- build_crossscale_index(maps)              #`cs_idx` stores fast row-level indices used in scoring and selection algorithms.
+conn   <- build_multiscale_connectivity_matrix(maps)
+conn      #This sparse matrix encodes parent–child connections across resolutions.
+
+# prioritizr problem (not solving to keep vignette fast)
+#p <- problem(s, features = colnames(feature_mat))... #create a problem
+
+#`add_multiscale_connectivity_penalties()` encourages co-selection between connected parent–child cells: increasing the penalty encourages more nested, scale-consistent solutions.
+# p <- add_multiscale_connectivity_penalties(
+#   p, penalty = 1, data = conn)
+# s <- solve(p) # any prioritizr-compatible solver may be used 
+
+# Fabricate a small "portfolio" of solutions (0/1 columns) to demonstrate post-hoc tools
+# In a real workflow these columns would come from solve(p).
+# solution_1 co-selects parent1 and kid1 => overlap exists
+s$solution_1 <- c(1L, 0L, 0L, 1L, 0L)
+s$solution_2 <- c(0L, 0L, 1L, 0L, 1L)
+
+# Overlap diagnostics on raw selections (counts co-selected ancestor–descendant pairs)
+compute_overlaps_by_resolution(
+  s        = s,
+  flag_col = "solution_1",
+  maps     = maps
+)
+
+# Deduplicate overlaps:
+# Multiscale solutions may co-select both a coarse-resolution cell and one or more of its finer descendants; `deduplicate_h3_selections()` resolves these overlaps by retaining only one representative planning unit per location according to a chosen rule (i.e., `"finer_first"` or `"coarser_first"`).
+# "finer_first": keep children; drop overlapping ancestors (the resulting solution may have less total area than the original solution if not all the children were selected)
+s_finer <- deduplicate_h3_selections(
+  s                     = s,
+  sel_col               = "solution_1",
+  h3_vec                = maps$h3_vec,
+  res_vec               = maps$res_vec,
+  res_levels            = maps$res_levels,
+  nearest_parent_row_of = maps$nearest_parent_row_of,
+  children_by_row       = maps$children_by_row,
+  mode                  = "finer_first"
+)
+# "coarser_first": keep parent; drop overlapping children (total area is the same as the deduplicated solution)
+s_coarser <- deduplicate_h3_selections(
+  s                     = s,
+  sel_col               = "solution_1",
+  h3_vec                = maps$h3_vec,
+  res_vec               = maps$res_vec,
+  res_levels            = maps$res_levels,
+  nearest_parent_row_of = maps$nearest_parent_row_of,
+  children_by_row       = maps$children_by_row,
+  mode                  = "coarser_first"
+)
+
+# Compare what is kept (new column solution_1_deduplicated added, solution_1 column remain untouched)
+sf::st_drop_geometry(s_finer)[, c("h3_address","res","solution_1","solution_1_deduplicated")]
+sf::st_drop_geometry(s_coarser)[, c("h3_address","res","solution_1","solution_1_deduplicated")]
+
+# Compute PU scores
+# This function calculates a continuous importance score at each planning unit’s native resolution to create an importance ranking that can be used in the "scenario creation" (i.e., by the compute_selection_by_resolution and compute_selection_by_strata functions). 
+s_scored <- compute_pu_scores(
+  s           = s,
+  feature_mat = feature_mat,
+  alpha_freq  = 0.5)
+sf::st_drop_geometry(s_scored)[, c("h3_address","res","ensemble_score")]
+
+# Cross-scale scores: 
+# extends the scoring concept across resolutions and for each planning unit, the function computes scores at its "native" resolution and propagates them through the hierarchical structure. As a result, every planning unit with ancestors/descendants receives its native importance score and additional resolution-specific scores propagated through the hierarchy (one column per resolution).
+# These scores allow users to compare how different scales prioritize the same location (according to the features defined at that resolution).
+s_xscored <- compute_pu_scores_crossscale(
+  s           = s,
+  feature_mat = feature_mat,
+  maps        = maps,
+  cs_idx      = cs_idx,
+  agg_mode    = "mean",
+  res_col     = "res"
+)
+sf::st_drop_geometry(s_xscored)[, c("h3_address","res","score_from_r7","score_from_r8")]
+
+# Post-hoc scenarios
+# These functions rank planning units by importance and select the top units until user-defined area targets are met. Targets may be defined:
+# a) By resolution (e.g. 30% of total area at each resolution, each resolution can have its own target)
+s_res_scen <- compute_selection_by_resolution(
+  s         = s_scored,
+  cs_idx    = cs_idx,
+  target    = 0.30,
+  score_col = "ensemble_score",
+  area_col  = "area_km2",
+  res_col   = "res",
+  out_col   = "selected_by_resolution",
+  target_by_res = c("7" = 0.30, "8" = 0.50)
+)
+
+sf::st_drop_geometry(s_res_scen)[, c("h3_address","res","area_km2","ensemble_score","selected_by_resolution")]
+
+# b) By strata (simulate governance constraints, e.g. different targets per administrative unit such as countries, counties, etc)
+strata_masks <- list(
+  A = (sf::st_drop_geometry(s_res_scen)$admin == "A"),
+  B = (sf::st_drop_geometry(s_res_scen)$admin == "B"),
+  C = (sf::st_drop_geometry(s_res_scen)$admin == "C"))
+
+s_strat_scen <- compute_selection_by_strata(
+  s                = s_scored,
+  cs_idx           = cs_idx,
+  strata_masks     = strata_masks,
+  admin_strata     = "admin",
+  score_col        = "ensemble_score",
+  area_col         = "area_km2",
+  res_col          = "res",
+  out_col          = "selected_by_admin",
+  target_by_strata = c(A = 0.14, B = 0.50, C = 0.50)
+)
+
+sf::st_drop_geometry(s_strat_scen)[, c("admin","h3_address","res","area_km2","ensemble_score","selected_by_admin")]
+
+# Coverage summaries
+# These functions account explicitly for hierarchical overlap, which is important when reporting protected areas in multiscale systems where the same location may appear simultaneously as a coarse-resolution cell and multiple finer-resolution descendants (i.e., there is no "deduplication" step). They credit coverage once per location by propagating selections across the parent–child structure before computing area totals. This ensures that reported coverage reflects the actual spatial footprint rather than raw counts of selected planning units.
+summarize_coverage_by_resolution(
+  s        = s_res_scen,
+  flag_col = "selected_by_resolution",
+  cs_idx   = cs_idx
+)
+
+summarize_coverage_by_strata(
+  s            = s_strat_scen,
+  flag_col     = "selected_by_admin",
+  cs_idx       = cs_idx,
+  strata_col   = "admin"
+)
+
+# Feature representation in a multiscale context
+# Features may be defined at only one "native" resolution, but protection can occur via ancestors/descendants. These functions propagate selection through the H3 hierarchy so that representation is credited even when selection occurs in a non-native resolution, and without double-counting overlaps (see "Why multiscale feature evaluation is needed").
+
+eval_geom_feature_coverage(
+  s            = s_strat_scen,
+  flag_col     = "selected_by_admin",
+  feature_cols = c("r7_f1", "r8_f1"),
+  res_col      = "res",
+  targets      = c(r7_f1 = 0.30, r8_f1 = 0.30)
+)
+
+# NOTE: If your features are rasters (not PU-level columns), use eval_exact_raster_coverage()
+# to compute area-integrated coverage directly from the raster surface.
+
