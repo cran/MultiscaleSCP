@@ -20,3 +20,17 @@ force_epsg4326 <- function(r) {
   cr <- terra::crs(r, proj = TRUE)
   if (is.na(cr) || !grepl("EPSG:4326", cr)) terra::project(r, "EPSG:4326") else r
 }
+
+# Selected descendants add no area when a selected ancestor covers them
+.ms_coverage_rows <- function(rows, res_vec, cs_idx) {
+  rows <- unique(as.integer(rows))
+  keep <- rep(TRUE, length(rows))
+  
+  for (r in unique(res_vec[rows])) {
+    ancestors <- cs_idx$anc_at_res[[as.character(r)]][rows]
+    nested <- which(res_vec[rows] > r & !is.na(ancestors))
+    keep[nested] <- keep[nested] & !(ancestors[nested] %in% rows)
+  }
+  
+  rows[keep]
+}

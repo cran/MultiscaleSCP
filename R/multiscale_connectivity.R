@@ -1,11 +1,13 @@
 #' Add multiscale connectivity penalties to a prioritizr problem
 #'
 #' @description
-#' This function mirrors [prioritizr::add_connectivity_penalties()] but adds a
-#' second, independent symmetric penalty for cross-resolution (vertical)
-#' connectivity between H3 planning units. It accepts the same input formats
-#' (matrix, `Matrix::dgCMatrix`, data frame, or 4D array) and internally
-#' converts them to a sparse connectivity matrix.
+#' Adds penalties to a conservation planning problem to account for
+#' cross-resolution connectivity between H3 planning units. Connections with
+#' larger values are given greater importance when identifying solutions with
+#' coordinated selection across resolutions.
+#' Connectivity data can be supplied as a matrix, `Matrix::dgCMatrix`, data
+#' frame in Marxan format, or four-dimensional array, following the formats
+#' supported by [prioritizr::add_connectivity_penalties()].
 #'
 #' @inheritParams prioritizr::add_connectivity_penalties
 #' @param data A symmetric connectivity object (matrix, `Matrix::dgCMatrix`,

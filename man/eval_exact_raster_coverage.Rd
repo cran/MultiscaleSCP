@@ -55,6 +55,15 @@ proportion of the feature represented by the solution.
 If targets are provided, the function also reports absolute and
 relative shortfalls from those targets.
 }
+\section{Deprecated}{
+
+This function is deprecated and retained for compatibility. For multiscale
+workflows, use \code{\link[=build_multiscale_objective_data]{build_multiscale_objective_data()}} together with
+\code{\link[=eval_multiscale_atom_solution]{eval_multiscale_atom_solution()}}. The atom-based evaluator uses precomputed
+multiscale data and matching planning-unit row order, and has different
+arguments and accounting semantics from this raster-based function.
+}
+
 \examples{
 \donttest{
 # Tiny raster with a single layer named with r7_ prefix

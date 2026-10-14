@@ -27,12 +27,13 @@ and evaluation functions.
 }
 \examples{
 h3_child  <- "8a2a1072b59ffff"
-h3_parent <- "872a1072bffffff"
+h3_parent <- "892a1072b5bffff"
 
-maps <- build_h3_maps(
-  s_or_h3 = c(h3_parent, h3_child),
-  res_vec = c(7L, 8L)
-)
+h3_vec <- c(h3_parent, h3_child)
+h3_res <- h3jsr::get_res(h3_vec, simple = TRUE)
+
+maps <- build_h3_maps(s_or_h3 = h3_vec, res_vec = h3_res)
+
 cs_idx <- build_crossscale_index(maps)
 
 names(cs_idx)

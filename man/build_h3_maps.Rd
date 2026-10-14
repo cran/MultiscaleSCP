@@ -7,31 +7,36 @@
 build_h3_maps(s_or_h3, res_vec = NULL, res_levels = NULL)
 }
 \arguments{
-\item{s_or_h3}{Either an \code{sf} object with \code{h3_address} and \code{res} columns,
-or a character vector of H3 indexes.}
+\item{s_or_h3}{An \code{sf} object or data frame containing \code{h3_address} and
+\code{res} columns, or a character vector of H3 indexes.}
 
-\item{res_vec}{Optional integer vector of resolutions if \code{s_or_h3} is not an \code{sf}.}
+\item{res_vec}{Optional integer vector of H3 resolutions. Required when
+\code{s_or_h3} is supplied as a character vector.}
 
-\item{res_levels}{Optional integer vector of reporting resolutions.}
+\item{res_levels}{Optional integer vector of resolutions represented in the
+hierarchy. Defaults to the unique resolutions in the planning units.}
 }
 \value{
 A list with elements \code{h3_vec}, \code{res_vec}, \code{res_levels},
 \code{row_idx_by_h3}, \code{nearest_parent_row_of}, and \code{children_by_row}.
 }
 \description{
-Creates basic parent–child relationships for a multiresolution H3 planning-unit
-dataset. This is the \strong{core structure} used by all cross-scale operations.
+Creates parent--child relationships among H3 planning units represented at
+multiple resolutions.
+}
+\details{
+The supplied \code{res} or \code{res_vec} values are used directly and should match
+the resolutions encoded by the corresponding H3 indexes.
 }
 \examples{
 # Minimal example: two resolutions, parent-child relationship
 h3_child  <- "8a2a1072b59ffff" # example H3 index
-h3_parent <- "872a1072bffffff"
+h3_parent <- "892a1072b5bffff"
 
-maps <- build_h3_maps(
-  s_or_h3  = c(h3_parent, h3_child),
-  res_vec  = c(7L, 8L),
-  res_levels = c(7L, 8L)
-)
+h3_vec <- c(h3_parent, h3_child)
+h3_res <- h3jsr::get_res(h3_vec, simple = TRUE)
+
+maps <- build_h3_maps(s_or_h3 = h3_vec, res_vec = h3_res)
 
 str(maps, max.level = 1)
 maps$nearest_parent_row_of

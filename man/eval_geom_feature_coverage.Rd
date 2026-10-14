@@ -53,6 +53,15 @@ shortfalls from those targets.
 Feature coverage is calculated using fractional overlap between planning
 units and the union of selected planning units.
 }
+\section{Deprecated}{
+
+This function is deprecated and retained for compatibility. For multiscale
+workflows, use \code{\link[=build_multiscale_objective_data]{build_multiscale_objective_data()}} together with
+\code{\link[=eval_multiscale_atom_solution]{eval_multiscale_atom_solution()}}. The evaluator uses precomputed
+multiscale data and matching planning-unit row order, and has different
+arguments and accounting semantics from this geometry-based function.
+}
+
 \examples{
 # Minimal polygons
 p1 <- sf::st_polygon(list(rbind(c(0, 0), c(1, 0), c(1, 1), c(0, 1), c(0, 0))))

@@ -17,19 +17,19 @@ so that each parent–child link appears in both directions.}
 A \code{Matrix::dgCMatrix} connectivity matrix of size \verb{n_pu × n_pu}.
 }
 \description{
-Construct a symmetric sparse connectivity matrix linking each finer H3
-planning unit to its parent at the next coarser resolution. This is
+Constructs a sparse connectivity matrix linking each finer planning unit
+to its ancestor at the next coarser resolution represented in \code{maps}. This is
 typically used as the \code{data} input to \code{\link[=add_multiscale_connectivity_penalties]{add_multiscale_connectivity_penalties()}}.
 }
 \examples{
 # Minimal 2-resolution parent-child example
 h3_child  <- "8a2a1072b59ffff"
-h3_parent <- "872a1072bffffff"
+h3_parent <- "892a1072b5bffff"
 
-maps <- build_h3_maps(
-  s_or_h3 = c(h3_parent, h3_child),
-  res_vec = c(7L, 8L)
-)
+h3_vec <- c(h3_parent, h3_child)
+h3_res <- h3jsr::get_res(h3_vec, simple = TRUE)
+
+maps <- build_h3_maps(s_or_h3 = h3_vec, res_vec = h3_res)
 
 conn <- build_multiscale_connectivity_matrix(maps)
 conn

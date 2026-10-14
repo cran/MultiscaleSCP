@@ -22,7 +22,7 @@
 #' the total selected area if only a subset of their descendant cells were
 #' selected (i.e., partial coverage of the parent footprint).
 #'
-#' The function operates in a **single pass**, using the precomputed parent/child
+#' The function uses the precomputed parent/child
 #' lists from [`build_h3_maps()`], and produces a new column
 #' `paste0(sel_col, "_deduplicated")`.
 #'

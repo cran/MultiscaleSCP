@@ -1,13 +1,19 @@
 #' Build H3 hierarchy maps for multiscale planning units
 #'
 #' @description
-#' Creates basic parent–child relationships for a multiresolution H3 planning-unit
-#' dataset. This is the **core structure** used by all cross-scale operations.
+#' Creates parent--child relationships among H3 planning units represented at
+#' multiple resolutions.
 #'
-#' @param s_or_h3 Either an `sf` object with `h3_address` and `res` columns,
-#'   or a character vector of H3 indexes.
-#' @param res_vec Optional integer vector of resolutions if `s_or_h3` is not an `sf`.
-#' @param res_levels Optional integer vector of reporting resolutions.
+#' @param s_or_h3 An `sf` object or data frame containing `h3_address` and
+#'   `res` columns, or a character vector of H3 indexes.
+#' @param res_vec Optional integer vector of H3 resolutions. Required when
+#'   `s_or_h3` is supplied as a character vector.
+#' @param res_levels Optional integer vector of resolutions represented in the
+#'   hierarchy. Defaults to the unique resolutions in the planning units.
+#'
+#' @details
+#' The supplied `res` or `res_vec` values are used directly and should match
+#' the resolutions encoded by the corresponding H3 indexes.
 #'
 #' @return A list with elements `h3_vec`, `res_vec`, `res_levels`,
 #'   `row_idx_by_h3`, `nearest_parent_row_of`, and `children_by_row`.
@@ -15,13 +21,12 @@
 #' @examples
 #' # Minimal example: two resolutions, parent-child relationship
 #' h3_child  <- "8a2a1072b59ffff" # example H3 index
-#' h3_parent <- "872a1072bffffff"
+#' h3_parent <- "892a1072b5bffff"
 #'
-#' maps <- build_h3_maps(
-#'   s_or_h3  = c(h3_parent, h3_child),
-#'   res_vec  = c(7L, 8L),
-#'   res_levels = c(7L, 8L)
-#' )
+#' h3_vec <- c(h3_parent, h3_child)
+#' h3_res <- h3jsr::get_res(h3_vec, simple = TRUE)
+#'
+#' maps <- build_h3_maps(s_or_h3 = h3_vec, res_vec = h3_res)
 #'
 #' str(maps, max.level = 1)
 #' maps$nearest_parent_row_of
@@ -32,18 +37,65 @@
 build_h3_maps <- function(s_or_h3, res_vec = NULL, res_levels = NULL) {
   
   if (is.null(res_vec)) {
-    s <- s_or_h3
-    h3_vec <- as.character(s$h3_address)
-    res_vec <- as.integer(s$res)
+    if (
+      !is.data.frame(s_or_h3) ||
+      !all(c("h3_address", "res") %in% names(s_or_h3))
+    ) {
+      stop(
+        "`s_or_h3` must contain `h3_address` and `res` columns ",
+        "when `res_vec` is not supplied."
+      )
+    }
+    
+    h3_vec <- as.character(s_or_h3$h3_address)
+    res_vec <- suppressWarnings(as.integer(s_or_h3$res))
+    
   } else {
     h3_vec <- as.character(s_or_h3)
-    res_vec <- as.integer(res_vec)
+    res_vec <- suppressWarnings(as.integer(res_vec))
   }
   
   N <- length(h3_vec)
-  stopifnot(length(res_vec) == N)
   
-  res_levels <- if (is.null(res_levels)) sort(unique(res_vec)) else sort(unique(as.integer(res_levels)))
+  if (N == 0L || length(res_vec) != N) {
+    stop("`res_vec` must contain one resolution for every H3 index.")
+  }
+  
+  if (anyNA(h3_vec) || any(!nzchar(h3_vec))) {
+    stop("H3 indexes must be non-missing and non-empty.")
+  }
+  
+  if (anyDuplicated(h3_vec)) {
+    stop("H3 indexes must be unique.")
+  }
+  
+  if (
+    anyNA(res_vec) ||
+    any(res_vec < 0L) ||
+    any(res_vec > 15L)
+  ) {
+    stop("H3 resolutions must be integers between 0 and 15.")
+  }
+  
+  res_levels <- if (is.null(res_levels)) {
+    sort(unique(res_vec))
+  } else {
+    sort(unique(as.integer(res_levels)))
+  }
+  
+  if (
+    !length(res_levels) ||
+    anyNA(res_levels) ||
+    any(res_levels < 0L) ||
+    any(res_levels > 15L) ||
+    !all(res_vec %in% res_levels)
+  ) {
+    stop(
+      "`res_levels` must contain valid H3 resolutions and include every ",
+      "resolution present in the planning units."
+    )
+  }
+  
   row_idx_by_h3 <- setNames(seq_len(N), h3_vec)
   
   nearest_parent_row_of <- rep(NA_integer_, N)
@@ -55,7 +107,7 @@ build_h3_maps <- function(s_or_h3, res_vec = NULL, res_levels = NULL) {
     parent_found <- NA_integer_
     for (k in seq.int(pos - 1L, 1L)) {
       r_up <- res_levels[k]
-      cur_h3 <- h3jsr::get_parent(cur_h3, r_up, simple = TRUE)#cur_h3 <- h3forr::h3_to_parent(cur_h3, r_up)
+      cur_h3 <- h3jsr::get_parent(cur_h3, r_up, simple = TRUE)
       parent_found <- as.integer(row_idx_by_h3[cur_h3])
       if (!is.na(parent_found)) break
     }
@@ -97,12 +149,13 @@ build_h3_maps <- function(s_or_h3, res_vec = NULL, res_levels = NULL) {
 #'
 #' @examples
 #' h3_child  <- "8a2a1072b59ffff"
-#' h3_parent <- "872a1072bffffff"
+#' h3_parent <- "892a1072b5bffff"
 #'
-#' maps <- build_h3_maps(
-#'   s_or_h3 = c(h3_parent, h3_child),
-#'   res_vec = c(7L, 8L)
-#' )
+#' h3_vec <- c(h3_parent, h3_child)
+#' h3_res <- h3jsr::get_res(h3_vec, simple = TRUE)
+#'
+#' maps <- build_h3_maps(s_or_h3 = h3_vec, res_vec = h3_res)
+#' 
 #' cs_idx <- build_crossscale_index(maps)
 #'
 #' names(cs_idx)

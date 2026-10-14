@@ -172,9 +172,9 @@ summarize_coverage_by_resolution <- function(
         }
       }
     }
-    
     # (2) finer: top-up ancestor, capped by ancestor area
-    fine <- which(df$.flag == 1L & res_vec > r0)
+    fine <- .ms_coverage_rows(
+      which(df$.flag == 1L & res_vec > r0), res_vec, cs_idx)
     if (length(fine)) {
       for (i in fine) {
         a <- anc_at_res[[as.character(r0)]][i]
@@ -284,7 +284,7 @@ summarize_coverage_by_strata <- function(
   strata_vals <- strata_vals[!is.na(strata_vals)] # strata to report
   
   # precompute selected indices once, and their coarse/fine splits per r0
-  sel_idx_all <- which(df$.flag == 1L)
+  sel_idx_all <- .ms_coverage_rows(which(df$.flag == 1L), res_vec, cs_idx)
   sel_res_all <- res_vec[sel_idx_all]
   
   r0_vals <- unique(as.integer(native_res_of))
@@ -432,6 +432,13 @@ summarize_coverage_by_strata <- function(
 #'   res_col = "res"
 #' )
 #' 
+#' @section Deprecated:
+#' This function is deprecated and retained for compatibility. For multiscale 
+#' workflows, use [build_multiscale_objective_data()] together with
+#' [eval_multiscale_atom_solution()]. The evaluator uses precomputed
+#' multiscale data and matching planning-unit row order, and has different
+#' arguments and accounting semantics from this geometry-based function.
+#'
 #' @export
 eval_geom_feature_coverage <- function(
     s,
@@ -440,6 +447,8 @@ eval_geom_feature_coverage <- function(
     res_col = "res",
     targets = NULL
 ) {
+  .Deprecated("eval_multiscale_atom_solution", package = "MultiscaleSCP")
+
   
   if (!inherits(s, "sf")) stop("`s` must be an sf object.")
   if (!flag_col %in% names(s)) stop("Missing flag_col: ", flag_col)
@@ -631,6 +640,13 @@ eval_geom_feature_coverage <- function(
 #' )
 #' }
 #' 
+#' @section Deprecated:
+#' This function is deprecated and retained for compatibility. For multiscale
+#' workflows, use [build_multiscale_objective_data()] together with
+#' [eval_multiscale_atom_solution()]. The atom-based evaluator uses precomputed
+#' multiscale data and matching planning-unit row order, and has different
+#' arguments and accounting semantics from this raster-based function.
+#'
 #' @export
 eval_exact_raster_coverage <- function(
     spp_all,          # SpatRaster or RasterStack/Brick
@@ -639,6 +655,8 @@ eval_exact_raster_coverage <- function(
     targets = NULL,   # Optional named target vector (e.g., c("r7_feat" = 0.3))
     res_col = "res"   # resolution column in pu_sf (default "res")
 ) {
+  .Deprecated("eval_multiscale_atom_solution", package = "MultiscaleSCP")
+
   # convert rasters to a RasterStack for exactextractr
   if (inherits(spp_all, "SpatRaster")) {
     rstack <- raster::stack(spp_all)

@@ -145,7 +145,7 @@ compute_selection_by_resolution <- function(
     cov_native <- numeric(length(idx_r0))
     pos_r0     <- pos_in_res[[as.character(r0)]]
     # only look at selected indices
-    fine_idx <- sel_idx[res_sel > r0]
+    fine_idx <- .ms_coverage_rows(sel_idx[res_sel > r0], res_vec, cs_idx)
     if (length(fine_idx)) {
       a <- anc_at_res[[as.character(r0)]][fine_idx]
       keep <- which(!is.na(a))
@@ -372,7 +372,7 @@ compute_selection_by_strata <- function(
   cov_for_admin_res <- function(r0, idx_native, pos_native) {
     cov <- numeric(length(idx_native))
     
-    sel1 <- which(sel == 1L)
+    sel1 <- .ms_coverage_rows(which(sel == 1L), res_vec, cs_idx)
     if (!length(sel1)) return(cov)
     
     # coarser/equal selections (any strata)
@@ -424,7 +424,17 @@ compute_selection_by_strata <- function(
       if (is.na(p)) return(0)
       rem <- idx_native_area[p] - covA[p]
       if (rem <= 0) return(0)
-      min(area[i], rem)
+      selected <- .ms_coverage_rows(which(sel == 1L), res_vec, cs_idx)
+      already_covered <- any(vapply(anc_at_res, function(a) {
+        a[i] %in% selected
+      }, logical(1)))
+      if (already_covered) return(0)
+      ancestors <- anc_at_res[[as.character(res_vec[i])]][selected]
+      descendants <- selected[which(
+        res_vec[selected] > res_vec[i] & ancestors == i
+      )]
+      new_area <- max(0, area[i] - sum(area[descendants], na.rm = TRUE))
+      min(new_area, rem)
     }
   }
   
@@ -537,8 +547,7 @@ compute_selection_by_strata <- function(
               if (!is.na(a)) {
                 p <- pos_native[a]
                 if (!is.na(p)) {
-                  rem <- idx_native_area[p] - covA[p]
-                  if (rem > 0) covA[p] <- covA[p] + min(area[i], rem)
+                  covA[p] <- covA[p] + g
                 }
               }
             }

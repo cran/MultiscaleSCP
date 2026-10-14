@@ -60,33 +60,32 @@ add_multiscale_connectivity_penalties(
 \arguments{
 \item{x}{\code{\link[prioritizr:problem]{problem()}} object.}
 
-\item{penalty}{\code{numeric} penalty that is used to scale the importance
+\item{penalty}{\code{numeric} value denoting the importance
 of selecting planning units with strong connectivity between them compared
-to the main problem objective (e.g., solution cost when the argument to
+to the main problem objective (e.g., solution cost if
 \code{x} has a minimum set objective set using
 \code{\link[prioritizr:add_min_set_objective]{add_min_set_objective()}}). Higher \code{penalty} values
 can be used to obtain solutions with a high degree of connectivity,
 and smaller \code{penalty} values can be used to obtain solutions with a
 small degree of connectivity. Note that negative \code{penalty} values can
-be used to obtain solutions that have very little connectivity.}
+be used to obtain solutions that avoid connectivity.}
 
 \item{zones}{\code{matrix} or \code{Matrix} object describing the
 level of connectivity between different zones. Each row and column
-corresponds to a different zone in the argument to \code{x}, and cell
+corresponds to a different zone in \code{x}, and cell
 values indicate the level of connectivity between each combination
 of zones. Cell values along the diagonal of the matrix represent
 the level of connectivity between planning units allocated to the
-same zone. Cell values must lay between 1 and -1, where negative
-values favor solutions with weak connectivity. The default argument to
-\code{zones} is an identity matrix (i.e., a matrix with ones along the
+same zone. Cell values must range between 1 and -1, where negative
+values favor solutions with weak connectivity. Defaults to an identity
+matrix (i.e., a matrix with ones along the
 matrix diagonal and zeros elsewhere), so that planning units are
 only considered to be connected when they are allocated to the same zone.
-This argument is required when working with multiple zones and the
-argument to \code{data} is a \code{matrix} or \code{Matrix} object.
-If the argument to \code{data} is an \code{array} or \code{data.frame} with data for
+Note that \code{zones} is only required when working with multiple zones and
+\code{data} is a \code{matrix} or \code{Matrix} object.
+If \code{data} is an \code{array} or \code{data.frame} with data for
 multiple zones (e.g., using the \code{"zone1"} and \code{"zone2"} column names),
-this argument must explicitly be set to \code{NULL} otherwise an error will be
-thrown.}
+then \code{zones} must be \code{NULL}.}
 
 \item{data}{A symmetric connectivity object (matrix, \code{Matrix::dgCMatrix},
 data frame in Marxan format, or 4D array) describing cross-scale links.}
@@ -98,11 +97,13 @@ symmetric degree normalization before penalization.}
 The modified \code{ConservationProblem} object.
 }
 \description{
-This function mirrors \code{\link[prioritizr:add_connectivity_penalties]{prioritizr::add_connectivity_penalties()}} but adds a
-second, independent symmetric penalty for cross-resolution (vertical)
-connectivity between H3 planning units. It accepts the same input formats
-(matrix, \code{Matrix::dgCMatrix}, data frame, or 4D array) and internally
-converts them to a sparse connectivity matrix.
+Adds penalties to a conservation planning problem to account for
+cross-resolution connectivity between H3 planning units. Connections with
+larger values are given greater importance when identifying solutions with
+coordinated selection across resolutions.
+Connectivity data can be supplied as a matrix, \code{Matrix::dgCMatrix}, data
+frame in Marxan format, or four-dimensional array, following the formats
+supported by \code{\link[prioritizr:add_connectivity_penalties]{prioritizr::add_connectivity_penalties()}}.
 }
 \section{Functions}{
 \itemize{

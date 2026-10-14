@@ -1,188 +1,200 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment  = "#>",
-  message  = FALSE,
-  warning  = FALSE
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 7,
+  fig.height = 4
 )
 
 library(MultiscaleSCP)
 library(sf)
 library(prioritizr)
-library(h3jsr)
-library(dplyr)
 
-## ----example------------------------------------------------------------------
-# tiny multiscale H3 system (3 parents at resolution 7; 2 kids at resolution 8 under parent1)
-parent1 <- "87182e586ffffff"
-kids1   <- unlist(h3jsr::get_children(parent1, 8, simple = TRUE), use.names = FALSE)[1:2]
-parent2 <- "87182e584ffffff"
-parent3 <- "87182e5b3ffffff"
+have_highs <- requireNamespace("highs", quietly = TRUE)
 
-h3_vec  <- c(parent1, parent2, parent3, kids1)
-res_vec <- c(7L, 7L, 7L, 8L, 8L) #resolution vector
+## ----planning-units-----------------------------------------------------------
+seed <- "87182e586ffffff"
 
-# Create polygon geometries from H3 cells
-geom <- do.call(c, lapply(h3_vec, function(x) h3jsr::cell_to_polygon(x, simple = TRUE)))
+grandparent <- h3jsr::get_parent(seed, 5L, simple = TRUE)
 
-df <- data.frame(
-  h3_address = h3_vec,
-  res        = res_vec,
-  area_km2   = c(14,14,14,2,2), #not true H3 areas
-  admin      = c("A", "B", "B", "C", "C") #e.g., 2 countries and 1 county within one of them
+parents <- h3jsr::get_children(grandparent, 6L, simple = TRUE)
+parents <- sort(as.character(unlist(parents, use.names = FALSE)))[1:2]
+
+parent_full <- parents[1]
+parent_partial <- parents[2]
+
+# get the seven children for the first parent.
+children_full <- h3jsr::get_children(parent_full, 7L, simple = TRUE)
+children_full <- sort(as.character(unlist(children_full, use.names = FALSE)))
+
+# Only two available children for the second parent.
+children_partial_all <- h3jsr::get_children(parent_partial, 7L, simple = TRUE)
+children_partial_all <- sort(as.character(unlist(children_partial_all, use.names = FALSE)))
+children_partial <- children_partial_all[1:2]
+
+h3_vec <- c(parent_full,children_full,parent_partial,children_partial)
+
+pu <- h3jsr::cell_to_polygon(h3_vec, simple = FALSE)
+pu <- pu[match(h3_vec, pu$h3_address), ]
+pu <- sf::st_transform(pu, 3857)
+
+pu$res <- c(6L,rep(7L, length(children_full)),6L,rep(7L, length(children_partial)))
+
+# Synthetic additive costs.
+pu$cost <- c(14,rep(2, length(children_full)),14,rep(2, length(children_partial)))
+
+maps <- build_h3_maps(pu,res_levels = c(6L, 7L))
+
+knitr::kable(sf::st_drop_geometry(pu)[, c("h3_address", "res", "cost")])
+
+## ----features-----------------------------------------------------------------
+full_parent_row <- match(parent_full, pu$h3_address)
+partial_parent_row <- match(parent_partial, pu$h3_address)
+
+full_child_rows <- match(children_full, pu$h3_address)
+partial_child_rows <- match(children_partial, pu$h3_address)
+
+# The common resolution-6 feature occurs once below each parent.
+common_rows <- c(
+  full_child_rows[1],
+  partial_child_rows[1]
 )
 
-s <- sf::st_sf(df, geometry = geom) |> sf::st_set_crs(4326)
-
-# Feature matrix (resolution-prefixed)
-# In a real workflow, these are typically PU-level feature relative coverage of each polygon.
-feature_mat <- data.frame(
-  r7_f1 = c(1.0, 0.2, 0.0, 0.0, 0.0),   # only meaningful at r7 rows
-  r8_f1 = c(0.0, 0.0, 0.0, 0.6, 0.2)    # only meaningful at r8 rows
+feature_common <- sf::st_sf(
+  geometry = sf::st_point_on_surface(
+    sf::st_geometry(pu)[common_rows]
+  )
 )
 
-# Also attach features as columns (so eval_geom_feature_coverage() can use them directly)
-s <- dplyr::bind_cols(s, feature_mat)
-
-# Build hierarchy, cross-scale index, and multiscale connectivity matrix
-maps   <- build_h3_maps(s, res_levels = c(7L, 8L))  #`maps` stores ancestry mappings.  
-cs_idx <- build_crossscale_index(maps)              #`cs_idx` stores fast row-level indices used in scoring and selection algorithms.
-conn   <- build_multiscale_connectivity_matrix(maps)
-conn      #This sparse matrix encodes parent–child connections across resolutions.
-
-# prioritizr problem (not solving to keep vignette fast)
-#p <- problem(s, features = colnames(feature_mat))... #create a problem
-
-#`add_multiscale_connectivity_penalties()` encourages co-selection between connected parent–child cells: increasing the penalty encourages more nested, scale-consistent solutions.
-# p <- add_multiscale_connectivity_penalties(
-#   p, penalty = 1, data = conn)
-# s <- solve(p) # any prioritizr-compatible solver may be used 
-
-# Fabricate a small "portfolio" of solutions (0/1 columns) to demonstrate post-hoc tools
-# In a real workflow these columns would come from solve(p).
-# solution_1 co-selects parent1 and kid1 => overlap exists
-s$solution_1 <- c(1L, 0L, 0L, 1L, 0L)
-s$solution_2 <- c(0L, 0L, 1L, 0L, 1L)
-
-# Overlap diagnostics on raw selections (counts co-selected ancestor–descendant pairs)
-compute_overlaps_by_resolution(
-  s        = s,
-  flag_col = "solution_1",
-  maps     = maps
+# The unique resolution-6 feature occurs only below the partial parent.
+# Put it inside its second available child.
+feature_unique <- sf::st_sf(
+  geometry = sf::st_point_on_surface(
+    sf::st_geometry(pu)[partial_child_rows[2]]
+  )
 )
 
-# Deduplicate overlaps:
-# Multiscale solutions may co-select both a coarse-resolution cell and one or more of its finer descendants; `deduplicate_h3_selections()` resolves these overlaps by retaining only one representative planning unit per location according to a chosen rule (i.e., `"finer_first"` or `"coarser_first"`).
-# "finer_first": keep children; drop overlapping ancestors (the resulting solution may have less total area than the original solution if not all the children were selected)
-s_finer <- deduplicate_h3_selections(
-  s                     = s,
-  sel_col               = "solution_1",
-  h3_vec                = maps$h3_vec,
-  res_vec               = maps$res_vec,
-  res_levels            = maps$res_levels,
-  nearest_parent_row_of = maps$nearest_parent_row_of,
-  children_by_row       = maps$children_by_row,
-  mode                  = "finer_first"
+# Fine feature: two occurrences below each parent.
+fine_rows <- c(full_child_rows[1:2],partial_child_rows)
+
+feature_fine <- sf::st_sf(geometry = sf::st_point_on_surface(
+  sf::st_geometry(pu)[fine_rows]))
+
+pu <- load_multiscale_feature(pu = pu,source = feature_common,
+  native_res = 6L,maps = maps,feature_name = "FeatureA")
+
+pu <- load_multiscale_feature(pu = pu,source = feature_unique,
+  native_res = 6L,maps = maps,feature_name = "FeatureB")
+
+pu <- load_multiscale_feature(pu = pu,source = feature_fine,
+  native_res = 7L,maps = maps,feature_name = "FeatureC")
+
+feature_cols <- multiscale_feature_cols(pu)
+
+knitr::kable(sf::st_drop_geometry(pu)[,c("h3_address","res","cost","r6_FeatureA","msopt_FeatureA")])
+
+## ----feature-map, echo=FALSE, fig.width=7, fig.height=4.5---------------------
+plot(sf::st_geometry(pu[pu$res == 6L, ]),col = "grey95",border = "grey35",
+     lwd = 2,main = "Synthetic multiscale conservation features")
+
+plot(sf::st_geometry(pu[pu$res == 7L, ]),add = TRUE,
+  col = "aliceblue",border = "grey60")
+
+# Redraw parent boundaries above the children.
+plot(sf::st_geometry(pu[pu$res == 6L, ]),add = TRUE,
+  col = NA,border = "grey25",lwd = 2)
+
+plot(sf::st_geometry(feature_common),add = TRUE,pch = 1,
+  col = "darkorange",cex = 1.8,lwd = 2)
+
+plot(sf::st_geometry(feature_unique),add = TRUE,
+  pch = 4,col = "firebrick",cex = 1.8,lwd = 2)
+
+plot(sf::st_geometry(feature_fine),add = TRUE,
+  pch = 16,col = "navy",cex = 1.2)
+
+legend("topleft",
+  legend = c("FeatureA (res. 6)","FeatureB (res. 6)","FeatureC (res. 7)"),
+  pch = c(1, 4, 16),col = c("darkorange", "firebrick", "navy"),bty = "n")
+
+## ----atoms--------------------------------------------------------------------
+ms_data <- build_multiscale_objective_data(pu = pu,maps = maps,feature_cols = feature_cols,
+                                           native_cols = names(feature_cols),cost_col = "cost")
+
+## ----problems-----------------------------------------------------------------
+targets <- c(r6_FeatureA = 1/2, r6_FeatureB = 1, r7_FeatureC = 1/2)
+
+# Keep the same order used by the problem and atom data.
+targets <- targets[names(feature_cols)]
+
+# Conventional minimum-set formulation.
+p_classic <- prioritizr::problem(pu,features = names(feature_cols),cost_column = "cost") |>
+  prioritizr::add_min_set_objective() |>
+  prioritizr::add_relative_targets(targets) |>
+  prioritizr::add_binary_decisions()
+
+# Multiscale minimum-set formulation.
+p_atom <- prioritizr::problem(pu,features = names(feature_cols),cost_column = "cost") |>
+  add_multiscale_min_set(data = ms_data,targets = targets) |>
+  prioritizr::add_binary_decisions()
+
+## ----solve, eval=have_highs---------------------------------------------------
+s_classic <- solve(prioritizr::add_highs_solver(p_classic,gap = 0,verbose = FALSE))
+s_atom <- solve(prioritizr::add_highs_solver(p_atom,gap = 0,verbose = FALSE))
+
+classic_eval <- eval_multiscale_atom_solution(s_classic,"solution_1",ms_data,targets)
+atom_eval <- eval_multiscale_atom_solution(s_atom,"solution_1",ms_data,targets)
+
+comparison <- data.frame(
+  Approach = c("Conventional minimum-set","Multiscale atom minimum-set"),
+  Selected_PUs = c(sum(s_classic$solution_1),sum(s_atom$solution_1)),
+  Cost = c(classic_eval$deduplicated_cost,atom_eval$deduplicated_cost),
+  FeatureA_held = c(classic_eval$relative_held["r6_FeatureA"],
+    atom_eval$relative_held["r6_FeatureA"]),
+  FeatureB_held = c(classic_eval$relative_held["r6_FeatureB"],
+    atom_eval$relative_held["r6_FeatureB"]),
+  FeatureC_held = c(classic_eval$relative_held["r7_FeatureC"],
+    atom_eval$relative_held["r7_FeatureC"]),
+  Targets_met = c(all(classic_eval$target_met),all(atom_eval$target_met)))
+
+knitr::kable(comparison,digits = 2,
+  col.names = c("Approach","Selected PUs","Cost", "Feature A held","Feature B held","Feature C held","All targets met"))
+
+## ----solution-maps, eval=have_highs, fig.width=8, fig.height=4----------------
+plot_solution <- function(x, title) {
+  parent_rows <- x$res == 6L
+  child_rows <- x$res == 7L
+  parent_selected <- x$solution_1[parent_rows] == 1
+  child_selected <- x$solution_1[child_rows] == 1
+  plot(sf::st_geometry(x[parent_rows, ]),
+    col = ifelse(parent_selected, "lightblue", "grey95"),border = "grey30",
+    lwd = 2,main = title)
+  plot(sf::st_geometry(x[child_rows, ]),
+    add = TRUE,col = ifelse(child_selected, "steelblue", NA),
+    border = "grey60",lwd = 0.8)
+  plot(sf::st_geometry(x[parent_rows, ]),add = TRUE,col = NA,border = "grey20",lwd = 2)
+}
+
+op <- par(mfrow = c(1, 2),mar = c(0.5, 0.5, 3, 0.5))
+plot_solution(s_classic,"Conventional minimum-set")
+plot_solution(s_atom,"Multiscale minimum-set")
+
+## ----connectivity-matrix------------------------------------------------------
+vertical <- build_multiscale_connectivity_matrix(
+  maps,
+  symmetric = TRUE
 )
-# "coarser_first": keep parent; drop overlapping children (total area is the same as the deduplicated solution)
-s_coarser <- deduplicate_h3_selections(
-  s                     = s,
-  sel_col               = "solution_1",
-  h3_vec                = maps$h3_vec,
-  res_vec               = maps$res_vec,
-  res_levels            = maps$res_levels,
-  nearest_parent_row_of = maps$nearest_parent_row_of,
-  children_by_row       = maps$children_by_row,
-  mode                  = "coarser_first"
-)
 
-# Compare what is kept (new column solution_1_deduplicated added, solution_1 column remain untouched)
-sf::st_drop_geometry(s_finer)[, c("h3_address","res","solution_1","solution_1_deduplicated")]
-sf::st_drop_geometry(s_coarser)[, c("h3_address","res","solution_1","solution_1_deduplicated")]
+vertical
 
-# Compute PU scores
-# This function calculates a continuous importance score at each planning unit’s native resolution to create an importance ranking that can be used in the "scenario creation" (i.e., by the compute_selection_by_resolution and compute_selection_by_strata functions). 
-s_scored <- compute_pu_scores(
-  s           = s,
-  feature_mat = feature_mat,
-  alpha_freq  = 0.5)
-sf::st_drop_geometry(s_scored)[, c("h3_address","res","ensemble_score")]
-
-# Cross-scale scores: 
-# extends the scoring concept across resolutions and for each planning unit, the function computes scores at its "native" resolution and propagates them through the hierarchical structure. As a result, every planning unit with ancestors/descendants receives its native importance score and additional resolution-specific scores propagated through the hierarchy (one column per resolution).
-# These scores allow users to compare how different scales prioritize the same location (according to the features defined at that resolution).
-s_xscored <- compute_pu_scores_crossscale(
-  s           = s,
-  feature_mat = feature_mat,
-  maps        = maps,
-  cs_idx      = cs_idx,
-  agg_mode    = "mean",
-  res_col     = "res"
-)
-sf::st_drop_geometry(s_xscored)[, c("h3_address","res","score_from_r7","score_from_r8")]
-
-# Post-hoc scenarios
-# These functions rank planning units by importance and select the top units until user-defined area targets are met. Targets may be defined:
-# a) By resolution (e.g. 30% of total area at each resolution, each resolution can have its own target)
-s_res_scen <- compute_selection_by_resolution(
-  s         = s_scored,
-  cs_idx    = cs_idx,
-  target    = 0.30,
-  score_col = "ensemble_score",
-  area_col  = "area_km2",
-  res_col   = "res",
-  out_col   = "selected_by_resolution",
-  target_by_res = c("7" = 0.30, "8" = 0.50)
-)
-
-sf::st_drop_geometry(s_res_scen)[, c("h3_address","res","area_km2","ensemble_score","selected_by_resolution")]
-
-# b) By strata (simulate governance constraints, e.g. different targets per administrative unit such as countries, counties, etc)
-strata_masks <- list(
-  A = (sf::st_drop_geometry(s_res_scen)$admin == "A"),
-  B = (sf::st_drop_geometry(s_res_scen)$admin == "B"),
-  C = (sf::st_drop_geometry(s_res_scen)$admin == "C"))
-
-s_strat_scen <- compute_selection_by_strata(
-  s                = s_scored,
-  cs_idx           = cs_idx,
-  strata_masks     = strata_masks,
-  admin_strata     = "admin",
-  score_col        = "ensemble_score",
-  area_col         = "area_km2",
-  res_col          = "res",
-  out_col          = "selected_by_admin",
-  target_by_strata = c(A = 0.14, B = 0.50, C = 0.50)
-)
-
-sf::st_drop_geometry(s_strat_scen)[, c("admin","h3_address","res","area_km2","ensemble_score","selected_by_admin")]
-
-# Coverage summaries
-# These functions account explicitly for hierarchical overlap, which is important when reporting protected areas in multiscale systems where the same location may appear simultaneously as a coarse-resolution cell and multiple finer-resolution descendants (i.e., there is no "deduplication" step). They credit coverage once per location by propagating selections across the parent–child structure before computing area totals. This ensures that reported coverage reflects the actual spatial footprint rather than raw counts of selected planning units.
-summarize_coverage_by_resolution(
-  s        = s_res_scen,
-  flag_col = "selected_by_resolution",
-  cs_idx   = cs_idx
-)
-
-summarize_coverage_by_strata(
-  s            = s_strat_scen,
-  flag_col     = "selected_by_admin",
-  cs_idx       = cs_idx,
-  strata_col   = "admin"
-)
-
-# Feature representation in a multiscale context
-# Features may be defined at only one "native" resolution, but protection can occur via ancestors/descendants. These functions propagate selection through the H3 hierarchy so that representation is credited even when selection occurs in a non-native resolution, and without double-counting overlaps (see "Why multiscale feature evaluation is needed").
-
-eval_geom_feature_coverage(
-  s            = s_strat_scen,
-  flag_col     = "selected_by_admin",
-  feature_cols = c("r7_f1", "r8_f1"),
-  res_col      = "res",
-  targets      = c(r7_f1 = 0.30, r8_f1 = 0.30)
-)
-
-# NOTE: If your features are rasters (not PU-level columns), use eval_exact_raster_coverage()
-# to compute area-integrated coverage directly from the raster surface.
+## ----connectivity-example, eval=FALSE-----------------------------------------
+# p_connected <- prioritizr::problem(pu,features = names(feature_cols),cost_column = "cost") |>
+#   add_multiscale_min_set(data = ms_data,targets = targets) |>
+#   add_multiscale_connectivity_penalties(penalty = 0.05, data = vertical) |>
+#   prioritizr::add_binary_decisions() |>
+#   prioritizr::add_highs_solver(gap = 0,verbose = FALSE)
+# 
+# # s_connected <- solve(p_connected)
 
